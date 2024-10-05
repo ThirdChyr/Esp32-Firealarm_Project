@@ -1,8 +1,8 @@
 #include <ArtronShop_LineNotify.h>
 #include <WiFi.h>
 
-#define sw1 5
-#define sw2 18
+#define sw1 16
+#define sw2 17
 #define Line_Token "Oz8Std7nyz5atmRCkKGtyRTGdenQXAo804gWSRRMSCL"
 const char* ssid = "realme C55";
 const char* pass = "tatty040347";
