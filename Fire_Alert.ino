@@ -29,9 +29,12 @@ const char *pass = "tatty040347";
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
 Adafruit_AHTX0 AHT10;
-int timeout = 1000, timeless = 0, compass = 1;
 
-void SHOW_STATUS(int mode, int hum, int tem)
+float rl_temp ,rl_hum ;
+int time_check = 5000, timeless = 0, compass = 1;
+bool break_out = false,key_pass = false;
+
+void SHOW_STATUS(int mode, float hum, float tem)
 {
   display.clearDisplay();
   display.setTextSize(0.5);
@@ -71,32 +74,43 @@ void SHOW_TRANSITION(String chmod)
   display.println(F("Chmod complete"));
   display.display();
 }
-/*
-void ATH10_Transaction()
+void SHOW_WARNING( )
 {
+  display.clearDisplay();
+  display.display();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(20, 30);
+  display.println(F("FIRE ALERT!!"));
+  display.display();
 }
-void BH1750_VCC_Transaction()
+bool VALUE_PROVE(float temp,float hum)
 {
+  if(temp >=50 && hum <=25)
+  {
+    return true;
+  }
+  else
+  {
+    return false;
+  }
 }
-void BH1750_GND_Transaction()
-{
-}
-void LINE_SEND_MESSAGE(String value)
-{
-  LINE.send(value);
-}
-*/
 int CHANGE_MODE(int compass)
 {
-  if (compass == 1)
+  if (compass == 2)
   {
     return 2;
   }
-  else if (compass == 2)
+  else if (compass == 1)
   {
     return 1;
   }
   return 1;
+}/*
+void AHT10_START()
+{
+   sensors_event_t humidity, temp;
+   AHT10.getEvent(&humidity, &temp);
 }
 /*
 int SAVE_DATA(int addr,int value)
@@ -108,9 +122,9 @@ bool DISITION_GUIDE()
 {
 
 }*/
-int Get_time()
+int Get_time(int timecheck)
 {
-  return 1000;
+  return timecheck;
 }
 void setup()
 {
@@ -119,8 +133,8 @@ void setup()
   {
     Serial.println("Not found AHT10");
   }
-  // LINE.begin(Line_Token);
-  // WiFi.begin(ssid,pass);
+  //LINE.begin(Line_Token);
+  //WiFi.begin(ssid,pass);
   // Wire.begin();
   //  dht.begin();
   pinMode(SW1, INPUT_PULLUP);
@@ -139,19 +153,17 @@ void setup()
 
 void loop()
 {
-  if (millis() - timeless > 1000)
+  if (millis() - timeless > Get_time(time_check))
   {
     timeless = millis();
+    //AHT10_START();
     sensors_event_t humidity, temp;
-      AHT10.getEvent(&humidity, &temp);
+    AHT10.getEvent(&humidity, &temp);
+     rl_temp = temp.temperature;
+     rl_hum = humidity.relative_humidity;
+     Serial.println(rl_temp);
+     Serial.println(rl_hum);
 
-      Serial.print("Temperature: ");
-      Serial.print(temp.temperature);
-      Serial.println(" C");
-
-      Serial.print("Humidity: ");
-      Serial.print(humidity.relative_humidity);
-      Serial.println(" %");
     if (Serial.available() > 0)
     {
       String TEXT_INPUT = Serial.readString();
@@ -160,20 +172,47 @@ void loop()
       // int TEXT_INT = TEXT_INPUT.toInt();
       if (TEXT_INPUT == "mode1")
       {
-        compass = CHANGE_MODE(2);
+        compass = CHANGE_MODE(1);
         SHOW_TRANSITION("chmod");
         delay(2000);
       }
       else if (TEXT_INPUT == "mode2")
       {
-        compass = CHANGE_MODE(1);
+        compass = CHANGE_MODE(2);
         SHOW_TRANSITION("chmod");
         delay(2000);
       }
+      else if(TEXT_INPUT == "trig")
+      {
+        break_out = true;
+      }
+      else if(TEXT_INPUT == "notrig")
+      {
+        break_out = false;
+        key_pass = false;
+      }
+      else if(TEXT_INPUT == "chmod")
+      {
+        key_pass = true;
+      }
+    }
+    if(rl_temp >= 50 || rl_hum <= 20 ||key_pass)
+    {
+      if(!VALUE_PROVE(rl_temp,rl_hum))
+      {
+        time_check = 2000;
+        compass = CHANGE_MODE(2);
+      }
     }
   }
-  else
-  {
-    SHOW_STATUS(compass, 20, 50);
-  }
+    if(break_out)
+    {
+      SHOW_WARNING();
+      delay(2000);
+    }
+    else
+    {
+    SHOW_STATUS(compass, rl_hum,rl_temp);
+    }
+  
 }
