@@ -1,12 +1,12 @@
-#include <Adafruit_AHTX0.h>
 
 // #include "DHT.h"
 #include <SPI.h>
 #include <Wire.h>
-// #include <EEPROM.h>
+#include <EEPROM.h>
 // #include <WiFi.h>
 // #include <esp_task_wdt.h>
 #include <Adafruit_GFX.h>
+#include <Adafruit_AHTX0.h>
 #include <Adafruit_SSD1306.h>
 // #include <ArtronShop_LineNotify.h>
 
@@ -17,6 +17,7 @@
 const char *ssid = "realme C55";
 const char *pass = "tatty040347";
 // Address Master and component
+#define EEPORM_SIZE 9
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_addr 0x3C
@@ -30,10 +31,16 @@ const char *pass = "tatty040347";
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
 Adafruit_AHTX0 AHT10;
 
-float rl_temp ,rl_hum ;
+float rl_temp, rl_hum,rl_light;
 int time_check = 5000, timeless = 0, compass = 1;
-bool break_out = false,key_pass = false;
+bool break_out = false, key_pass = false, Right_open = true, Left_open = false, Normal_mode = true, Fear_mode = false;
 
+void print(String input, String value)
+{
+  Serial.print(input);
+  Serial.print(" ");
+  Serial.println(value);
+}
 void SHOW_STATUS(int mode, float hum, float tem)
 {
   display.clearDisplay();
@@ -74,7 +81,7 @@ void SHOW_TRANSITION(String chmod)
   display.println(F("Chmod complete"));
   display.display();
 }
-void SHOW_WARNING( )
+void SHOW_WARNING()
 {
   display.clearDisplay();
   display.display();
@@ -84,9 +91,9 @@ void SHOW_WARNING( )
   display.println(F("FIRE ALERT!!"));
   display.display();
 }
-bool VALUE_PROVE(float temp,float hum)
+bool VALUE_PROVE(float temp, float hum)
 {
-  if(temp >=50 && hum <=25)
+  if (temp >= 50 && hum <= 25)
   {
     return true;
   }
@@ -106,22 +113,30 @@ int CHANGE_MODE(int compass)
     return 1;
   }
   return 1;
-}/*
-void AHT10_START()
-{
-   sensors_event_t humidity, temp;
-   AHT10.getEvent(&humidity, &temp);
 }
-/*
-int SAVE_DATA(int addr,int value)
+void SAVE_DATA(int addr, float value)
 {
-  //EEPORM.WriteUchar(addr,value);
-  //EEPORM.commit();
+  EEPORM.WriteUchar(addr, value);
+  EEPORM.commit();
 }
-bool DISITION_GUIDE()
+void CAL_MEAN(String name)
 {
-
-}*/
+  if (name == "temp")
+  {
+    float Mean_value = (EEPROM.readUChar(0) + EEPORM.readUChar(2)) / 2;
+    SAVE_DATA(1, Mean_value);
+  }
+  else if (name == "hum")
+  {
+    float Mean_value = (EEPROM.readUChar(3) + EEPORM.readUChar(5)) / 2;
+    SAVE_DATA(4, Mean_value);
+  }
+  else if (name == "light")
+  {
+    float Mean_value = (EEPROM.readUChar(6) + EEPORM.readUChar(8)) / 2;
+    SAVE_DATA(7, Mean_value);
+  }
+}
 int Get_time(int timecheck)
 {
   return timecheck;
@@ -129,47 +144,109 @@ int Get_time(int timecheck)
 void setup()
 {
   Serial.begin(115200);
-  if (AHT10.begin())
-  {
-    Serial.println("Not found AHT10");
-  }
-  //LINE.begin(Line_Token);
-  //WiFi.begin(ssid,pass);
-  // Wire.begin();
-  //  dht.begin();
+  Serial.println("---------------------Setup working------------------");
   pinMode(SW1, INPUT_PULLUP);
   pinMode(SW2, INPUT_PULLUP);
+  // LINE.begin(Line_Token);
+  // WiFi.begin(ssid,pass);
+  //  Wire.begin();
+  //   dht.begin();
   if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_addr))
   {
     Serial.println(F("SSD1306 allocation failed"));
   }
-  if (!AHT10.begin()) {
+  if (!AHT10.begin())
+  {
     Serial.println("AHT10 Not found!!");
-    while (1);
   }
-  Serial.println("Start");
-  // SHOW_STATUS(compass,20,50);
+  if (!EEPROM.begin(EEPROM_SIZE))
+  {
+    Serial.println("Failed init EEPROM");
+    delay(1000);
+    ESP.restart();
+  }
+
+  // AHT 10 Start Collecting
+  sensors_event_t humidity, temp;
+  AHT10.getEvent(&humidity, &temp);
+  rl_temp = temp.temperature;
+  rl_hum = humidity.relative_humidity;
+
+  print("Temp AHT10 ", rl_temp.str());
+  print("Hum AHT10", rl_hum.str());
+  SAVE_DATA(0, rl_temp);
+  SAVE_DATA(3, rl_hum);
+  // AHT 10 End
+
+  // DHT 22 Event Started!!
+  print("Temp DHT22", rl_temp.str());
+  print("Hum DHT22", rl_hum.str());
+  SAVE_DATA(2, rl_temp);
+  SAVE_DATA(5, rl_hum);
+  // DHT 22 End
+
+  // BH1750_VCC Event Started!!
+  print("Temp BH_VCC", rl_light.str());
+  SAVE_DATA(6, rl_light);
+  // BH1750_VCC
+
+  // BH1750_GND Event Started!!
+  print("Temp BH_GND", rl_light.str());
+  SAVE_DATA(8, rl_light);
+  //  BH1750_GND
+  
+  // Calculate Mean light,hum,temp value
+  CAL_MEAN("temp");
+  CAL_MEAN("hum");
+  CAL_MEAN("light");
+  // End calculate
+   Serial.println("---------------------Setup finished!!------------------");
+
 }
 
 void loop()
 {
-  if (millis() - timeless > Get_time(time_check))
+  if (Normal_mode)
   {
-    timeless = millis();
-    //AHT10_START();
-    sensors_event_t humidity, temp;
-    AHT10.getEvent(&humidity, &temp);
-     rl_temp = temp.temperature;
-     rl_hum = humidity.relative_humidity;
-     Serial.println(rl_temp);
-     Serial.println(rl_hum);
+    if (millis() - timeless > 5000)
+    {
+      timeless = millis();
+      if (Right_open && !Left_open)
+      {
+        // AHT 10 Event Started
+        sensors_event_t humidity, temp;
+        AHT10.getEvent(&humidity, &temp);
+        rl_temp = temp.temperature;
+        rl_hum = humidity.relative_humidity;
+        print("Temp", rl_temp.str());
+        print("Hum", rl_hum.str());
+        SAVE_DATA(0, rl_temp);
+        SAVE_DATA(4, rl_hum);
+        // AHT 10 Event Finished!!
 
+        if(VALUE_PROVE())
+        Right_open = !Right_open;
+        Left_open = !Left_open;
+      }
+      else if (!Right_open && Left_open)
+      {
+        // DHT 22 Event Starte
+        Right_open = !Right_open;
+        Left_open = !Left_open;
+      }
+      // AHT10_START();
+    }
+  }
+  else if (Fear_mode)
+  {
+  }
+}
+/*
     if (Serial.available() > 0)
     {
       String TEXT_INPUT = Serial.readString();
       TEXT_INPUT.trim();
       TEXT_INPUT.toLowerCase();
-      // int TEXT_INT = TEXT_INPUT.toInt();
       if (TEXT_INPUT == "mode1")
       {
         compass = CHANGE_MODE(1);
@@ -214,5 +291,4 @@ void loop()
     {
     SHOW_STATUS(compass, rl_hum,rl_temp);
     }
-  
-}
+*/
