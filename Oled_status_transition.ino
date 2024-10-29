@@ -27,7 +27,7 @@ const char *pass = "tatty040347";
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire); 
 
-int timeout = 1000,timeless=0,compass = 1;
+int timeout = 1000,timeless=0,mode_compass = 1;
 
 void SHOW_STATUS(int mode,int hum,int tem)
 {
@@ -141,13 +141,13 @@ void loop()
       //int TEXT_INT = TEXT_INPUT.toInt();
       if(TEXT_INPUT == "mode1")
       {
-        compass = CHANGE_MODE(2);
+        mode_compass = CHANGE_MODE(2);
         SHOW_TRANSITION("chmod");
         delay(2000);
       }
       else if(TEXT_INPUT == "mode2")
       {
-        compass = CHANGE_MODE(1);
+        mode_compass = CHANGE_MODE(1);
         SHOW_TRANSITION("chmod");
         delay(2000);
       }
@@ -156,6 +156,6 @@ void loop()
   }
   else
   {
-    SHOW_STATUS(compass,20,50);
+    SHOW_STATUS(mode_compass,20,50);
   }
 }
