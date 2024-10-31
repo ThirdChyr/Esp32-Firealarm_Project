@@ -1,4 +1,3 @@
-
 #include "DHT.h"
 #include <SPI.h>
 #include <Wire.h>
@@ -18,9 +17,9 @@
 #define DHT_TYPE DHT22
 
 // Line Token
-#define Line_Token "Oz8Std7nyz5atmRCkKGtyRTGdenQXAo804gWSRRMSCL"
-const char *ssid = "realme C55";
-const char *pass = "tatty040347";
+#define Line_Token ""
+const char *ssid = " ";
+const char *pass = "";
 // Address Master and component
 #define EEPROM_SIZE 36
 #define SCREEN_WIDTH 128
