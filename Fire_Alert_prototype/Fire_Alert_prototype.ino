@@ -9,11 +9,12 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_AHTX0.h>
 #include <Adafruit_SSD1306.h>
+#include <ArtronShop_BH1750.h>
 // #include <ArtronShop_LineNotify.h>
 
 #define SW1 16
 #define SW2 17
-#define DHT_PIN 13
+#define DHT_PIN 32
 #define DHT_TYPE DHT22
 
 // Line Token
@@ -28,17 +29,15 @@ const char *pass = "tatty040347";
 #define MPC23017 0x20
 // Address Slave
 // #define ATH10 0x38
-#define BH1750_VCC 0x5C
-#define BH1750_GND 0x23
 
-BH1750 lightSensor1(0x23); // Sensor 1 with ADDR to GND
-BH1750 lightSensor2(0x5C); // Sensor 2 with ADDR to VCC
+ArtronShop_BH1750 bh1750_VCC(0x5C, &Wire); 
+ArtronShop_BH1750 bh1750_GND(0x23, &Wire);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
 DHT dhtSensor(DHT_PIN, DHT_TYPE);
 Adafruit_AHTX0 AHT10;
 
-float rl_temp, rl_hum, mean_temp, mean_hum, pr_value, rl_light;
-int time_check = 5000, timeless = 0, compass = 1, time_count = 0;
+float rl_temp, rl_hum, mean_temp, mean_hum, pr_value, rl_light,lux_left,lux_right;
+int time_check = 5000, timeless = 0, mode_compass = 1, time_count = 0;
 bool break_out = false, key_pass = false, Right_open = true, Left_open = false, Normal_mode = true, Fear_mode = false;
 
 void print(String input, String value)
@@ -233,7 +232,6 @@ void setup()
   pinMode(SW2, INPUT_PULLUP);
   // LINE.begin(Line_Token);
   // WiFi.begin(ssid,pass);
-  //  Wire.begin();
   dhtSensor.begin();
   Wire.begin();
 
@@ -290,13 +288,13 @@ void setup()
   // DHT 22 End
 
   // BH1750_VCC Event Started!!
-  float lux_left = lightSensor1.readLightLevel();
+  lux_left = bh1750_VCC.light();
   print("Temp BH_VCC", String(lux_left));
   SAVE_DATA("light_left", lux_left);
   // BH1750_VCC
 
   // BH1750_GND Event Started!!
-  float lux_right = lightSensor2.readLightLevel();
+  lux_right = bh1750_GND.light();
   print("Temp BH_GND", String(lux_right));
   SAVE_DATA("light_right", lux_right);
   //  BH1750_GND
@@ -313,69 +311,38 @@ void loop()
 {
   if (Normal_mode)
   {
-    if (millis() - timeless > 5000)
+    if (millis() - timeless > 10000)
     {
-      /*
-      Serial.println("---------------------------Begin transaction-----------------------------");
-      EEPROM.get(CREATE_ADDR("temp_left"), pr_value);
-      Serial.print("Temp AHT10 ");
-      Serial.print(String(pr_value));
-
-        EEPROM.get(CREATE_ADDR("hum_left"), pr_value);
-      Serial.print("\nHum AHT10 ");
-      Serial.print(String(pr_value));
-
-        EEPROM.get(CREATE_ADDR("temp_right"), pr_value);
-      Serial.print("\nTemp DHT22 ");
-      Serial.print(String(pr_value));
-
-        EEPROM.get(CREATE_ADDR("hum_right"), pr_value);
-      Serial.print("\nHUM AHT10 ");
-      Serial.print(String(pr_value));
-
-        EEPROM.get(CREATE_ADDR("light_left"), pr_value);
-      Serial.print("\nBHT_GND LIGHT : ");
-      Serial.print(String(pr_value));
-
-        EEPROM.get(CREATE_ADDR("light_right"), pr_value);
-      Serial.print("\nBHT_VCC LIGHT : ");
-      Serial.print(String(pr_value));
-
-       EEPROM.get(CREATE_ADDR("temp_mean"), pr_value);
-      Serial.print("\nTEMP_MEAN : ");
-      Serial.print(String(pr_value));
-
-       EEPROM.get(CREATE_ADDR("hum_mean"), pr_value);
-      Serial.print("\nHUM_MEAN : ");
-      Serial.print(String(pr_value));
-
-      Serial.print("\n");
-      Serial.println("--------------------End Transaction----------------------------");*/
       timeless = millis();
       if (Right_open)
       {
+
         Serial.print("\nRIGHT_OPEN \n");
         // AHT 10 Start Collecting
         sensors_event_t humidity, temp;
         AHT10.getEvent(&humidity, &temp);
         rl_temp = temp.temperature;
         rl_hum = humidity.relative_humidity;
-
-        float lux_right = lightSensor2.readLightLevel();
-        print("Temp BH_GND", String(lux_right));
-        SAVE_DATA("light_right", lux_right);
-        // print("Temp AHT10 ", String(rl_temp));
-        // print("Hum AHT10", String(rl_hum));
-        SAVE_DATA("temp_right", rl_temp);
-        SAVE_DATA("hum_right", rl_hum);
+        print("Temp AHT10 ", String(rl_temp));
+        print("Hum AHT10", String(rl_hum));
         // AHT 10 End
 
+        // BHT_1750 Start
+        lux_right = bh1750_VCC.light();
+        print("Temp BH_VCC", String(lux_right));
+        // BHT_1750 End
+
+        SAVE_DATA("light_right", lux_right);
+        SAVE_DATA("temp_right", rl_temp);
+        SAVE_DATA("hum_right", rl_hum);
         EEPROM.get(CREATE_ADDR("temp_mean"), mean_temp);
         EEPROM.get(CREATE_ADDR("hum_mean"), mean_hum);
-        if (VALUE_PROVE(rl_temp, rl_hum) /*&& ((rl_temp <= mean_temp - 5) && (rl_hum <= mean_hum - 5))*/)
+
+        if (VALUE_PROVE(rl_temp, rl_hum) && ( (rl_temp <= mean_temp - 5) && (rl_hum <= mean_hum - 5)))
         {
           Right_open = !Right_open;
           Left_open = !Left_open;
+          delay(1000);
         }
         else
         {
@@ -387,23 +354,24 @@ void loop()
       {
 
         Serial.print("LEFT_OPEN \n");
-        // BH1750_VCC Event Started!!
-        float lux_left = lightSensor1.readLightLevel();
-        print("Temp BH_VCC", String(lux_left));
+        // BH1750_GND Event Started!!
+        float lux_left = bh1750_GND.light();
+        print("Temp BH_GND", String(lux_left));
         SAVE_DATA("light_left", lux_left);
-        // BH1750_VCC
+        // BH1750_GND
+
         // DHT 22 Event Started!!
         rl_temp = dhtSensor.readTemperature();
         rl_hum = dhtSensor.readHumidity();
-        // print("Temp DHT22", String(rl_temp));
-        // print("Hum DHT22", String(rl_hum));
+        print("Temp DHT22", String(rl_temp));
+        print("Hum DHT22", String(rl_hum));
         SAVE_DATA("temp_left", rl_temp);
         SAVE_DATA("hum_left", rl_hum);
         // DHT 22 End
 
         EEPROM.get(CREATE_ADDR("temp_mean"), mean_temp);
         EEPROM.get(CREATE_ADDR("hum_mean"), mean_hum);
-        if (VALUE_PROVE(rl_temp, rl_hum) /*&& ((rl_temp <= mean_temp - 5) && (rl_hum <= mean_hum - 5))*/)
+        if (VALUE_PROVE(rl_temp, rl_hum) && ((rl_temp <= mean_temp - 5) && (rl_hum <= mean_hum - 5))*/)
         {
           Right_open = !Right_open;
           Left_open = !Left_open;
@@ -433,18 +401,18 @@ void loop()
   else if (Fear_mode)
   {
     // Serial.print("---------------------Setup finished!!------------------");
-    if (millis() - timeless >= 2000)
+    /*if (millis() - timeless >= 2000)
     {
       timeless = millis();
       Serial.println("Clock taking");
       time_count++;
       if (time_count == 5)
-      {
+      {*/
         time_count = 0;
         Fear_mode = !Fear_mode;
         Normal_mode = !Normal_mode;
-      }
-    }
+     // }
+    //}
     SHOW_WARNING();
   }
   if (Normal_mode)
@@ -454,7 +422,7 @@ void loop()
     EEPROM.get(CREATE_ADDR("temp_mean"), mean_temp);
     EEPROM.get(CREATE_ADDR("hum_mean"), mean_hum);
 
-    SHOW_STATUS(compass, mean_hum, mean_temp);
+    SHOW_STATUS(mode_compass, mean_hum, mean_temp);
   }
 }
 /*
