@@ -484,7 +484,7 @@ void loop()
 
       if (count_down == 0)
       {
-        //buzzer_off();
+        buzzer_off();
         Normal_mode = true;
         Fear_mode = false;
         Alert_mode = false;
